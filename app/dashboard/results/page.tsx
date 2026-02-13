@@ -103,14 +103,14 @@ export default function ResultsPage() {
         </div>
 
         {/* Recommendations */}
-        {recommendations && recommendations.length > 0 && (
+        {recommendations && typeof recommendations === 'object' && (
           <div className="bg-white rounded-2xl shadow-lg border border-border p-6 mb-6">
             <h2 className="text-2xl font-bold text-foreground mb-4">AI Recommendations</h2>
             <div className="space-y-4">
-              {recommendations.map((rec: any, idx: number) => (
+              {Array.isArray(recommendations.recommendations) && recommendations.recommendations.map((rec: any, idx: number) => (
                 <div key={idx} className="border-l-4 border-primary pl-4 py-2">
-                  <p className="font-semibold text-foreground">{rec.title || rec.area}</p>
-                  <p className="text-sm text-muted-foreground mt-1">{rec.description || rec.suggestion}</p>
+                  <p className="font-semibold text-foreground">{rec.title || 'Recommendation'}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{rec.description || ''}</p>
                   {rec.priority && (
                     <span className={`inline-block text-xs font-semibold mt-2 px-2 py-1 rounded ${
                       rec.priority === 'high' ? 'bg-red-100 text-red-700' :
@@ -122,6 +122,11 @@ export default function ResultsPage() {
                   )}
                 </div>
               ))}
+              {recommendations.summary && (
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-primary/20">
+                  <p className="text-sm text-foreground">{recommendations.summary}</p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -131,14 +136,18 @@ export default function ResultsPage() {
           <div className="bg-white rounded-2xl shadow-lg border border-border p-6 mb-6">
             <h2 className="text-2xl font-bold text-foreground mb-4">Score Breakdown</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.entries(score.dimensions).map(([dimension, value]: any) => (
-                <div key={dimension} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-semibold text-foreground capitalize">{dimension.replace(/_/g, ' ')}</p>
+              {Object.entries(score.dimensions).map(([dimension, dimData]: any) => {
+                const scoreValue = typeof dimData === 'object' ? dimData.score : dimData
+                const displayName = typeof dimData === 'object' ? dimData.name : dimension.replace(/_/g, ' ')
+                return (
+                  <div key={dimension} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="font-semibold text-foreground capitalize">{displayName}</p>
+                    </div>
+                    <div className="text-2xl font-bold text-primary">{Math.round(scoreValue)}</div>
                   </div>
-                  <div className="text-2xl font-bold text-primary">{Math.round(value)}</div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
