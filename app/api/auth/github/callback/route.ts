@@ -1,30 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getGitHubUser, saveOrUpdateUser } from '@/lib/auth'
 
-const CLIENT_ID = process.env.GITHUB_CLIENT_ID!
-const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!
+const CLIENT_ID = process.env.GITHUB_CLIENT_ID
+const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET
 const REDIRECT_URI = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/auth/github/callback`
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const code = searchParams.get('code')
-  const error = searchParams.get('error')
-
-  // Handle GitHub auth errors
-  if (error) {
-    return NextResponse.redirect(
-      new URL(`/auth/error?message=${encodeURIComponent(error)}`, request.url)
-    )
-  }
-
-  if (!code) {
-    return NextResponse.redirect(
-      new URL('/auth/error?message=No authorization code received', request.url)
-    )
-  }
-
   try {
+    const searchParams = request.nextUrl.searchParams
+    const code = searchParams.get('code')
+    const error = searchParams.get('error')
+
+    console.log('[v0] OAuth callback received:', { code: code ? 'present' : 'missing', error })
+
+    // Validate environment variables
+    if (!CLIENT_ID || !CLIENT_SECRET) {
+      console.error('[v0] Missing GitHub credentials')
+      return NextResponse.redirect(
+        new URL('/auth/error?message=Server misconfiguration: Missing GitHub credentials', request.url)
+      )
+    }
+
+    // Handle GitHub auth errors
+    if (error) {
+      console.error('[v0] GitHub auth error:', error)
+      return NextResponse.redirect(
+        new URL(`/auth/error?message=${encodeURIComponent(error)}`, request.url)
+      )
+    }
+
+    if (!code) {
+      console.error('[v0] No authorization code received')
+      return NextResponse.redirect(
+        new URL('/auth/error?message=No authorization code received', request.url)
+      )
+    }
+
     // Exchange code for access token
+    console.log('[v0] Exchanging code for access token...')
     const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: {
@@ -39,51 +51,70 @@ export async function GET(request: NextRequest) {
       }),
     })
 
+    if (!tokenResponse.ok) {
+      console.error('[v0] Token exchange failed:', tokenResponse.status, tokenResponse.statusText)
+      return NextResponse.redirect(
+        new URL('/auth/error?message=Failed to exchange authorization code', request.url)
+      )
+    }
+
     const tokenData = await tokenResponse.json()
 
     if (!tokenData.access_token) {
-      console.error('[v0] Token error:', tokenData)
+      console.error('[v0] No access token in response:', tokenData)
       return NextResponse.redirect(
         new URL('/auth/error?message=Failed to obtain access token', request.url)
       )
     }
 
-    // Get user data from GitHub
-    const gitHubUser = await getGitHubUser(tokenData.access_token)
+    console.log('[v0] Access token obtained successfully')
 
-    if (!gitHubUser) {
-      console.error('[v0] Failed to get GitHub user')
+    // Get user data from GitHub
+    console.log('[v0] Fetching GitHub user data...')
+    const userResponse = await fetch('https://api.github.com/user', {
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`,
+        'User-Agent': 'GitIQ',
+      },
+    })
+
+    if (!userResponse.ok) {
+      console.error('[v0] Failed to fetch user:', userResponse.status)
       return NextResponse.redirect(
         new URL('/auth/error?message=Failed to fetch GitHub user data', request.url)
       )
     }
 
-    // Save or update user in database
-    const user = await saveOrUpdateUser(gitHubUser, tokenData.access_token)
+    const gitHubUser = await userResponse.json()
+    console.log('[v0] GitHub user fetched:', gitHubUser.login)
 
-    if (!user) {
-      console.error('[v0] Failed to save user')
-      return NextResponse.redirect(
-        new URL('/auth/error?message=Failed to save user data', request.url)
-      )
+    // For now, store minimal user data in session
+    const userData = {
+      id: gitHubUser.id,
+      github_id: gitHubUser.id,
+      github_username: gitHubUser.login,
+      avatar_url: gitHubUser.avatar_url,
+      bio: gitHubUser.bio,
+      access_token: tokenData.access_token,
     }
 
     // Create session cookie and redirect to dashboard
     const response = NextResponse.redirect(new URL('/dashboard', request.url))
     
     // Store user session in cookie
-    response.cookies.set('session', JSON.stringify(user), {
+    response.cookies.set('session', JSON.stringify(userData), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days
     })
 
+    console.log('[v0] User authenticated successfully, redirecting to dashboard')
     return response
   } catch (error) {
     console.error('[v0] OAuth callback error:', error)
     return NextResponse.redirect(
-      new URL('/auth/error?message=An error occurred during authentication', request.url)
+      new URL(`/auth/error?message=${encodeURIComponent('An error occurred during authentication')}`, request.url)
     )
   }
 }
