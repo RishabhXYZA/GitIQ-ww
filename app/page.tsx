@@ -13,7 +13,20 @@ export default async function Home() {
     redirect('/dashboard')
   }
 
-  const gitHubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/auth/github/callback&scope=repo,read:user&allow_signup=true`
+  // Build GitHub auth URL with proper URL encoding
+  const clientId = process.env.GITHUB_CLIENT_ID || ''
+  const redirectUri = process.env.NEXTAUTH_URL 
+    ? `${process.env.NEXTAUTH_URL}/api/auth/github/callback`
+    : 'http://localhost:3000/api/auth/github/callback'
+  
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    scope: 'repo,read:user',
+    allow_signup: 'true',
+  })
+  
+  const gitHubAuthUrl = `https://github.com/login/oauth/authorize?${params.toString()}`
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-teal-50 flex items-center justify-center p-4">
