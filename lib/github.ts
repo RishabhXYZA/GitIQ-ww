@@ -1,6 +1,8 @@
-import { neon } from '@neondatabase/serverless'
+import { Pool } from 'pg'
 
-const sql = neon(process.env.DATABASE_URL!)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+})
 
 export interface Repository {
   id: number
@@ -267,17 +269,18 @@ export async function getRecentRepositories(username: string, accessToken: strin
 export async function saveRepositories(userId: string, repositories: Repository[]) {
   try {
     for (const repo of repositories) {
-      await sql`
-        INSERT INTO repositories (user_id, repo_name, description, url, stars, language, updated_at, topics)
-        VALUES (${userId}, ${repo.name}, ${repo.description}, ${repo.url}, ${repo.stars}, ${repo.language}, ${repo.updated_at}, ${JSON.stringify(repo.topics)})
-        ON CONFLICT (user_id, repo_name)
-        DO UPDATE SET
-          description = ${repo.description},
-          stars = ${repo.stars},
-          language = ${repo.language},
-          updated_at = ${repo.updated_at},
-          topics = ${JSON.stringify(repo.topics)}
-      `
+      await pool.query(
+        `INSERT INTO repositories (user_id, repo_name, description, url, stars, language, updated_at, topics)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (user_id, repo_name)
+         DO UPDATE SET
+           description = $3,
+           stars = $5,
+           language = $6,
+           updated_at = $7,
+           topics = $8`,
+        [userId, repo.name, repo.description, repo.url, repo.stars, repo.language, repo.updated_at, JSON.stringify(repo.topics)]
+      )
     }
     return true
   } catch (error) {

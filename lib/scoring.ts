@@ -1,7 +1,9 @@
-import { neon } from '@neondatabase/serverless'
+import { Pool } from 'pg'
 import { Repository } from './github'
 
-const sql = neon(process.env.DATABASE_URL!)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+})
 
 export interface ScoreDimension {
   name: string
@@ -360,25 +362,27 @@ export async function calculateProfileScore(
   })
 
   // Get previous score for improvement calculation
-  const previousScores = await sql`
-    SELECT overall_score FROM score_history 
-    WHERE user_id = ${userId} 
-    ORDER BY created_at DESC 
-    LIMIT 1
-  `
+  const previousScoresResult = await pool.query(
+    `SELECT overall_score FROM score_history 
+     WHERE user_id = $1 
+     ORDER BY created_at DESC 
+     LIMIT 1`,
+    [userId]
+  )
 
   let improvement = null
-  if (previousScores.length > 0) {
-    improvement = overall - previousScores[0].overall_score
+  if (previousScoresResult.rows.length > 0) {
+    improvement = overall - previousScoresResult.rows[0].overall_score
   }
 
   const analysisId = `analysis_${userId}_${Date.now()}`
 
   // Save to database
-  await sql`
-    INSERT INTO score_history (user_id, overall_score, dimensions_data, improvement, created_at)
-    VALUES (${userId}, ${overall}, ${JSON.stringify(dimensions)}, ${improvement}, NOW())
-  `
+  await pool.query(
+    `INSERT INTO score_history (user_id, overall_score, dimensions_data, improvement, created_at)
+     VALUES ($1, $2, $3, $4, NOW())`,
+    [userId, overall, JSON.stringify(dimensions), improvement]
+  )
 
   return {
     overall: Math.round(overall),

@@ -1,7 +1,9 @@
-import { neon } from '@neondatabase/serverless'
+import { Pool } from 'pg'
 import { hash, compare } from 'bcryptjs'
 
-const sql = neon(process.env.DATABASE_URL!)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+})
 
 export async function hashPassword(password: string): Promise<string> {
   return hash(password, 10)
@@ -45,33 +47,35 @@ export async function getGitHubUser(accessToken: string): Promise<GitHubUser | n
 export async function saveOrUpdateUser(gitHubUser: GitHubUser, accessToken: string) {
   try {
     console.log('[v0] Saving user:', gitHubUser.login)
-    const result = await sql`
-      INSERT INTO users (github_id, github_username, avatar_url, bio)
-      VALUES (${gitHubUser.id}, ${gitHubUser.login}, ${gitHubUser.avatar_url}, ${gitHubUser.bio})
-      ON CONFLICT (github_id) 
-      DO UPDATE SET 
-        github_username = ${gitHubUser.login},
-        avatar_url = ${gitHubUser.avatar_url},
-        bio = ${gitHubUser.bio},
-        updated_at = NOW()
-      RETURNING id, github_id, github_username, avatar_url
-    `
+    const result = await pool.query(
+      `INSERT INTO users (github_id, github_username, avatar_url, bio)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (github_id) 
+       DO UPDATE SET 
+         github_username = $2,
+         avatar_url = $3,
+         bio = $4,
+         updated_at = NOW()
+       RETURNING id, github_id, github_username, avatar_url`,
+      [gitHubUser.id, gitHubUser.login, gitHubUser.avatar_url, gitHubUser.bio]
+    )
 
-    console.log('[v0] User saved successfully:', result)
-    return result[0] || null
+    console.log('[v0] User saved successfully:', result.rows)
+    return result.rows[0] || null
   } catch (error) {
     console.error('[v0] Error saving user:', error)
-    throw error // Re-throw to be caught by callback handler
+    throw error
   }
 }
 
 export async function getUserByGitHubId(githubId: string) {
   try {
-    const result = await sql`
-      SELECT * FROM users WHERE github_id = ${githubId}
-    `
+    const result = await pool.query(
+      'SELECT * FROM users WHERE github_id = $1',
+      [githubId]
+    )
 
-    return result[0] || null
+    return result.rows[0] || null
   } catch (error) {
     console.error('Error getting user:', error)
     return null
@@ -80,11 +84,12 @@ export async function getUserByGitHubId(githubId: string) {
 
 export async function getUserById(userId: string) {
   try {
-    const result = await sql`
-      SELECT id, github_id, github_username, avatar_url, bio, created_at, updated_at FROM users WHERE id = ${userId}
-    `
+    const result = await pool.query(
+      'SELECT id, github_id, github_username, avatar_url, bio, created_at, updated_at FROM users WHERE id = $1',
+      [userId]
+    )
 
-    return result[0] || null
+    return result.rows[0] || null
   } catch (error) {
     console.error('[v0] Error getting user by ID:', error)
     return null
