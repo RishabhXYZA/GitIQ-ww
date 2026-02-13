@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { Pool } from 'pg'
 import { getGitHubProfile, getPinnedRepositories, getTopStarredRepositories, getRecentRepositories, saveRepositories } from '@/lib/github'
 import { calculateProfileScore } from '@/lib/scoring'
 import { generateAndSaveRecommendations } from '@/lib/gemini'
-import { neon } from '@neondatabase/serverless'
 
-const sql = neon(process.env.DATABASE_URL!)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+})
 
 export async function POST(request: NextRequest) {
   try {

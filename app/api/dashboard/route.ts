@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { neon } from '@neondatabase/serverless'
+import { Pool } from 'pg'
 
-const sql = neon(process.env.DATABASE_URL!)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+})
 
 export async function GET(request: NextRequest) {
   try {

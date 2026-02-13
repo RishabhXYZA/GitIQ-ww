@@ -1,9 +1,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { Repository } from './github'
 import { ProfileScore } from './scoring'
-import { neon } from '@neondatabase/serverless'
+import { Pool } from 'pg'
 
-const sql = neon(process.env.DATABASE_URL!)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+})
 const client = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!)
 
 export interface AIRecommendation {

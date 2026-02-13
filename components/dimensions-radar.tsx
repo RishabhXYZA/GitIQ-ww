@@ -2,7 +2,7 @@
 
 import { ScoreDimension } from '@/lib/scoring'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { PolarAngleAxis, PolarGridAxis, Radar, RadarChart, ResponsiveContainer } from 'recharts'
+import { PolarAngleAxis, PolarGrid, Radar, RadarChart, ResponsiveContainer } from 'recharts'
 
 interface DimensionsRadarProps {
   dimensions: Record<string, ScoreDimension>
@@ -23,7 +23,7 @@ export function DimensionsRadar({ dimensions }: DimensionsRadarProps) {
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
           <RadarChart data={data}>
-            <PolarGridAxis stroke="hsl(var(--border))" />
+            <PolarGrid stroke="hsl(var(--border))" />
             <PolarAngleAxis dataKey="name" stroke="hsl(var(--muted-foreground))" />
             <Radar name="Score" dataKey="value" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.6} />
           </RadarChart>
