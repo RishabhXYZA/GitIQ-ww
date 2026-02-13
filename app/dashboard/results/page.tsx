@@ -8,55 +8,63 @@ export default function ResultsPage() {
   const router = useRouter()
   const [results, setResults] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    // Only run on client side
-    if (typeof window === 'undefined') return
-
-    const loadResults = () => {
-      try {
-        // Get analysis results from session storage
-        if (typeof sessionStorage === 'undefined') {
-          console.error('[v0] sessionStorage not available')
-          router.push('/dashboard/welcome')
-          return
-        }
-
-        const storedResults = sessionStorage.getItem('analysisResults')
-        if (!storedResults) {
-          console.log('[v0] No analysis results found, redirecting...')
-          setTimeout(() => router.push('/dashboard/welcome'), 100)
-          return
-        }
-
-        const data = JSON.parse(storedResults)
-        console.log('[v0] Results loaded:', data)
-        setResults(data)
-        setLoading(false)
-      } catch (error) {
-        console.error('[v0] Failed to parse results:', error)
-        setTimeout(() => router.push('/dashboard/welcome'), 100)
-      }
-    }
-
-    loadResults()
+    setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+
+    try {
+      const storedResults = sessionStorage.getItem('analysisResults')
+      if (!storedResults) {
+        router.push('/dashboard/welcome')
+        return
+      }
+
+      const data = JSON.parse(storedResults)
+      setResults(data)
+    } catch (error) {
+      console.error('[v0] Failed to load results:', error)
+      router.push('/dashboard/welcome')
+    } finally {
+      setLoading(false)
+    }
+  }, [mounted, router])
+
+  if (!mounted) {
+    return null
+  }
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-teal-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-xl text-foreground font-semibold">Loading results...</div>
+          <div className="text-xl text-foreground font-semibold">Loading analysis results...</div>
         </div>
       </div>
     )
   }
 
-  if (!results) {
-    return null
+  if (!results || !results.profile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-teal-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-foreground font-semibold mb-4">No results found</p>
+          <Link href="/dashboard/welcome" className="text-primary hover:underline">
+            Go back to analyze
+          </Link>
+        </div>
+      </div>
+    )
   }
 
-  const { profile, score, recommendations, repositories } = results
+  const profile = results.profile || {}
+  const score = results.score || { overall: 0, dimensions: {} }
+  const recommendations = results.recommendations || { summary: '', recommendations: [] }
+  const repositories = results.repositories || []
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-teal-50 p-4">
