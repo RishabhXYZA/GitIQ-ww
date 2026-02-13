@@ -13,23 +13,34 @@ export default function ResultsPage() {
     // Only run on client side
     if (typeof window === 'undefined') return
 
-    try {
-      // Get analysis results from session storage
-      const storedResults = sessionStorage.getItem('analysisResults')
-      if (!storedResults) {
-        console.log('[v0] No analysis results found, redirecting...')
-        router.push('/dashboard/welcome')
-        return
-      }
+    const loadResults = () => {
+      try {
+        // Get analysis results from session storage
+        if (typeof sessionStorage === 'undefined') {
+          console.error('[v0] sessionStorage not available')
+          router.push('/dashboard/welcome')
+          return
+        }
 
-      const data = JSON.parse(storedResults)
-      setResults(data)
-      setLoading(false)
-    } catch (error) {
-      console.error('[v0] Failed to parse results:', error)
-      router.push('/dashboard/welcome')
+        const storedResults = sessionStorage.getItem('analysisResults')
+        if (!storedResults) {
+          console.log('[v0] No analysis results found, redirecting...')
+          setTimeout(() => router.push('/dashboard/welcome'), 100)
+          return
+        }
+
+        const data = JSON.parse(storedResults)
+        console.log('[v0] Results loaded:', data)
+        setResults(data)
+        setLoading(false)
+      } catch (error) {
+        console.error('[v0] Failed to parse results:', error)
+        setTimeout(() => router.push('/dashboard/welcome'), 100)
+      }
     }
-  }, [router])
+
+    loadResults()
+  }, [])
 
   if (loading) {
     return (

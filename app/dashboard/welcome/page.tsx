@@ -53,21 +53,27 @@ export default function WelcomePage() {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Analysis failed')
+        throw new Error(errorData.error || `Analysis failed with status ${response.status}`)
       }
 
       const result = await response.json()
-      console.log('[v0] Analysis complete, redirecting...')
+      console.log('[v0] Analysis complete:', result)
       
       // Store results in session storage temporarily
-      sessionStorage.setItem('analysisResults', JSON.stringify(result))
+      if (typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('analysisResults', JSON.stringify(result))
+        console.log('[v0] Results stored in sessionStorage')
+      }
       
       // Redirect to results page
-      router.push('/dashboard/results')
+      setTimeout(() => {
+        router.push('/dashboard/results')
+      }, 100)
+      return
     } catch (err) {
       console.error('[v0] Analysis error:', err)
-      setError(err instanceof Error ? err.message : 'Analysis failed')
-    } finally {
+      const errorMsg = err instanceof Error ? err.message : 'Analysis failed'
+      setError(errorMsg)
       setAnalyzing(false)
     }
   }
