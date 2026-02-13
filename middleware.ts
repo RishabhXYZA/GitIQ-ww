@@ -20,5 +20,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/dashboard/:path*', '/analyze/:path*'],
+  matcher: ['/', '/dashboard/:path*', '/analyze/:path*', '/api/auth/github/callback'],
 }
