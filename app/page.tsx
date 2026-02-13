@@ -13,27 +13,8 @@ export default async function Home() {
     redirect('/dashboard')
   }
 
-  // Build GitHub auth URL with proper URL encoding
-  const clientId = process.env.GITHUB_CLIENT_ID || ''
-  const redirectUri = process.env.NEXTAUTH_URL 
-    ? `${process.env.NEXTAUTH_URL}/api/auth/github/callback`
-    : 'http://localhost:3000/api/auth/github/callback'
-  
-  console.log('[v0] OAuth Config:', {
-    clientId: clientId ? 'SET' : 'MISSING',
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'NOT SET',
-    redirectUri,
-  })
-  
-  const params = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    scope: 'repo,read:user',
-    allow_signup: 'true',
-  })
-  
-  const gitHubAuthUrl = `https://github.com/login/oauth/authorize?${params.toString()}`
-  console.log('[v0] GitHub Auth URL:', gitHubAuthUrl)
+  // GitHub OAuth initiation endpoint handles URL construction dynamically
+  const gitHubAuthUrl = '/api/auth/github/initiate'
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-teal-50 flex items-center justify-center p-4">
