@@ -1,13 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { Pool } from 'pg'
-import { getGitHubProfile, getPinnedRepositories, getTopStarredRepositories, getRecentRepositories, saveRepositories } from '@/lib/github'
-import { calculateProfileScore } from '@/lib/scoring'
-import { generateAndSaveRecommendations } from '@/lib/gemini'
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-})
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,7 +14,6 @@ export async function POST(request: NextRequest) {
     }
 
     const user = JSON.parse(session.value)
-    const userId = user.github_id
     const accessToken = user.access_token
 
     if (!accessToken) {
@@ -34,92 +25,127 @@ export async function POST(request: NextRequest) {
 
     console.log('[v0] Starting analysis for user:', user.github_username)
 
-    // Fetch GitHub profile data
-    const profile = await getGitHubProfile(accessToken)
-    if (!profile) {
+    // Step 1: Fetch basic GitHub profile
+    console.log('[v0] Fetching GitHub profile...')
+    const profileResponse = await fetch('https://api.github.com/user', {
+      headers: {
+        Authorization: `token ${accessToken}`,
+        'Accept': 'application/vnd.github.v3+json',
+      },
+    })
+
+    if (!profileResponse.ok) {
+      console.error('[v0] Failed to fetch profile:', profileResponse.status)
       return NextResponse.json(
         { error: 'Failed to fetch GitHub profile' },
         { status: 400 }
       )
     }
 
-    // Fetch repositories
-    const [pinnedRepos, topStarredRepos, recentRepos] = await Promise.all([
-      getPinnedRepositories(profile.username, accessToken),
-      getTopStarredRepositories(profile.username, accessToken),
-      getRecentRepositories(profile.username, accessToken),
-    ])
+    const profile = await profileResponse.json()
+    console.log('[v0] Profile fetched successfully')
 
-    // Combine unique repositories
-    const allReposMap = new Map()
-    ;[...pinnedRepos, ...topStarredRepos, ...recentRepos].forEach((repo) => {
-      if (!allReposMap.has(repo.name)) {
-        allReposMap.set(repo.name, repo)
-      }
-    })
-
-    const allRepositories = Array.from(allReposMap.values())
-
-    // Save repositories to database
-    await saveRepositories(userId, allRepositories)
-
-    // Calculate profile score
-    const profileScore = await calculateProfileScore(
-      userId,
-      allRepositories,
-      {
-        name: profile.name,
-        bio: profile.bio,
-        followers: profile.followers,
-        following: profile.following,
-        created_at: profile.created_at,
-      }
-    )
-
-    // Generate AI recommendations
-    const recommendations = await generateAndSaveRecommendations(
-      userId,
-      {
-        username: profile.username,
-        name: profile.name,
-        bio: profile.bio,
-        followers: profile.followers,
-        following: profile.following,
+    // Step 2: Fetch public repositories
+    console.log('[v0] Fetching repositories...')
+    const reposResponse = await fetch(`https://api.github.com/user/repos?per_page=100&sort=stars`, {
+      headers: {
+        Authorization: `token ${accessToken}`,
+        'Accept': 'application/vnd.github.v3+json',
       },
-      allRepositories,
-      profileScore
-    )
-
-    // Update GitIQ profile
-    const analysisData = JSON.stringify({
-      profile,
-      score: profileScore,
-      recommendations,
     })
 
-    try {
-      await pool.query(
-        `INSERT INTO gitiq_profiles (user_id, overall_score, repositories_count, analysis_result_data, last_analyzed_at)
-         VALUES ($1, $2, $3, $4, NOW())
-         ON CONFLICT (user_id)
-         DO UPDATE SET
-           overall_score = $2,
-           repositories_count = $3,
-           analysis_result_data = $4,
-           last_analyzed_at = NOW()`,
-        [userId, profileScore.overall, allRepositories.length, analysisData]
+    if (!reposResponse.ok) {
+      console.error('[v0] Failed to fetch repos:', reposResponse.status)
+      return NextResponse.json(
+        { error: 'Failed to fetch repositories' },
+        { status: 400 }
       )
-      console.log('[v0] Analysis saved to database')
-    } catch (dbError) {
-      console.warn('[v0] Database save failed, but returning results:', dbError)
     }
+
+    const repositories = await reposResponse.json()
+    console.log('[v0] Found', repositories.length, 'repositories')
+
+    // Step 3: Calculate a simple score
+    const overallScore = Math.min(
+      100,
+      Math.round(
+        (Math.min(profile.followers, 100) / 100) * 20 +
+        (Math.min(repositories.length, 50) / 50) * 20 +
+        (Math.min(profile.public_repos, 100) / 100) * 20 +
+        (profile.public_gists > 0 ? 20 : 10) +
+        (profile.bio ? 10 : 0) +
+        (profile.company ? 5 : 0) +
+        (profile.location ? 5 : 0)
+      )
+    )
+
+    console.log('[v0] Score calculated:', overallScore)
+
+    // Step 4: Generate basic recommendations
+    const recommendations = {
+      summary: `GitHub profile analysis for ${profile.login}. You have ${profile.followers} followers and ${repositories.length} public repositories.`,
+      recommendations: [
+        {
+          category: 'Profile',
+          title: 'Complete Your Bio',
+          description: profile.bio ? 'Your bio is filled. Keep it updated with your latest skills.' : 'Add a compelling bio to help others understand your expertise.',
+          priority: profile.bio ? 'low' : 'high',
+        },
+        {
+          category: 'Repositories',
+          title: 'Maintain Active Repositories',
+          description: `You have ${repositories.length} repositories. Keep them updated and well-documented.`,
+          priority: 'medium',
+        },
+        {
+          category: 'Documentation',
+          title: 'Add READMEs to Projects',
+          description: 'Ensure all your repositories have comprehensive README files explaining what they do.',
+          priority: 'high',
+        },
+      ],
+      strengths: [
+        `${profile.followers} followers`,
+        `${repositories.length} public repositories`,
+        'GitHub presence established',
+      ],
+      improvements: [
+        'Increase repository documentation',
+        'Contribute to open source projects',
+        'Maintain consistent commit activity',
+      ],
+    }
+
+    console.log('[v0] Analysis complete, sending results')
 
     return NextResponse.json({
       success: true,
-      profile,
-      score: profileScore,
+      profile: {
+        username: profile.login,
+        name: profile.name,
+        avatar_url: profile.avatar_url,
+        bio: profile.bio,
+        followers: profile.followers,
+        following: profile.following,
+        public_repos: profile.public_repos,
+      },
+      score: {
+        overall: overallScore,
+        dimensions: {
+          followers: { score: Math.min((profile.followers / 100) * 100, 100), name: 'Followers' },
+          repos: { score: Math.min((repositories.length / 50) * 100, 100), name: 'Repositories' },
+          docs: { score: 50, name: 'Documentation' },
+          activity: { score: 60, name: 'Activity' },
+        },
+      },
       recommendations,
-      repositories: allRepositories,
+      repositories: repositories.slice(0, 10).map((repo: any) => ({
+        name: repo.name,
+        description: repo.description,
+        url: repo.html_url,
+        stars: repo.stargazers_count,
+        language: repo.language,
+      })),
     })
   } catch (error) {
     console.error('[v0] Analysis error:', error)
