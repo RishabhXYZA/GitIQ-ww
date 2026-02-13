@@ -7,6 +7,8 @@ export default function WelcomePage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     // Get session from cookie
@@ -29,6 +31,42 @@ export default function WelcomePage() {
       setLoading(false)
     }
   }, [router])
+
+  const handleAnalyze = async () => {
+    setAnalyzing(true)
+    setError(null)
+
+    try {
+      console.log('[v0] Starting profile analysis...')
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      console.log('[v0] Analysis response status:', response.status)
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Analysis failed')
+      }
+
+      const result = await response.json()
+      console.log('[v0] Analysis complete, redirecting...')
+      
+      // Store results in session storage temporarily
+      sessionStorage.setItem('analysisResults', JSON.stringify(result))
+      
+      // Redirect to results page
+      router.push('/dashboard/results')
+    } catch (err) {
+      console.error('[v0] Analysis error:', err)
+      setError(err instanceof Error ? err.message : 'Analysis failed')
+    } finally {
+      setAnalyzing(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -78,10 +116,24 @@ export default function WelcomePage() {
             </div>
           </div>
 
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+              <p className="text-red-700 font-semibold">Analysis Error</p>
+              <p className="text-red-600 text-sm mt-1">{error}</p>
+            </div>
+          )}
+
           <div className="space-y-3">
+            <button 
+              onClick={handleAnalyze}
+              disabled={analyzing}
+              className="block w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-white font-semibold py-3 px-4 rounded-xl text-center transition"
+            >
+              {analyzing ? 'Analyzing Your Profile...' : 'Start Analysis'}
+            </button>
             <a 
               href="/dashboard"
-              className="block w-full bg-primary hover:bg-primary/90 text-white font-semibold py-3 px-4 rounded-xl text-center transition"
+              className="block w-full bg-secondary hover:bg-secondary/90 text-white font-semibold py-3 px-4 rounded-xl text-center transition"
             >
               Go to Dashboard
             </a>

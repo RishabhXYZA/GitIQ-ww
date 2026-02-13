@@ -22,22 +22,17 @@ export async function POST(request: NextRequest) {
     }
 
     const user = JSON.parse(session.value)
-    const userId = user.id
+    const userId = user.github_id
+    const accessToken = user.access_token
 
-    // Get user access token from database
-    const userRecord = await pool.query(
-      'SELECT access_token FROM users WHERE id = $1',
-      [userId]
-    )
-
-    if (userRecord.rows.length === 0 || !userRecord.rows[0].access_token) {
+    if (!accessToken) {
       return NextResponse.json(
-        { error: 'No GitHub access token found' },
+        { error: 'No GitHub access token in session' },
         { status: 400 }
       )
     }
 
-    const accessToken = userRecord.rows[0].access_token
+    console.log('[v0] Starting analysis for user:', user.github_username)
 
     // Fetch GitHub profile data
     const profile = await getGitHubProfile(accessToken)
@@ -102,17 +97,22 @@ export async function POST(request: NextRequest) {
       recommendations,
     })
 
-    await pool.query(
-      `INSERT INTO gitiq_profiles (user_id, overall_score, repositories_count, analysis_result_data, last_analyzed_at)
-       VALUES ($1, $2, $3, $4, NOW())
-       ON CONFLICT (user_id)
-       DO UPDATE SET
-         overall_score = $2,
-         repositories_count = $3,
-         analysis_result_data = $4,
-         last_analyzed_at = NOW()`,
-      [userId, profileScore.overall, allRepositories.length, analysisData]
-    )
+    try {
+      await pool.query(
+        `INSERT INTO gitiq_profiles (user_id, overall_score, repositories_count, analysis_result_data, last_analyzed_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (user_id)
+         DO UPDATE SET
+           overall_score = $2,
+           repositories_count = $3,
+           analysis_result_data = $4,
+           last_analyzed_at = NOW()`,
+        [userId, profileScore.overall, allRepositories.length, analysisData]
+      )
+      console.log('[v0] Analysis saved to database')
+    } catch (dbError) {
+      console.warn('[v0] Database save failed, but returning results:', dbError)
+    }
 
     return NextResponse.json({
       success: true,
@@ -122,9 +122,9 @@ export async function POST(request: NextRequest) {
       repositories: allRepositories,
     })
   } catch (error) {
-    console.error('Analysis error:', error)
+    console.error('[v0] Analysis error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to analyze profile', details: String(error) },
       { status: 500 }
     )
   }
