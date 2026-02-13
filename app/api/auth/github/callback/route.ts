@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Pool } from 'pg'
 
 const CLIENT_ID = process.env.GITHUB_CLIENT_ID
 const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-})
 
 export async function GET(request: NextRequest) {
   try {
@@ -98,43 +93,20 @@ export async function GET(request: NextRequest) {
     const gitHubUser = await userResponse.json()
     console.log('[v0] GitHub user fetched:', gitHubUser.login)
 
-    // Save user to database
-    console.log('[v0] Saving user to database...')
-    const dbResult = await pool.query(
-      `INSERT INTO users (github_id, github_username, avatar_url, bio)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (github_id)
-       DO UPDATE SET
-         github_username = $2,
-         avatar_url = $3,
-         bio = $4,
-         updated_at = NOW()
-       RETURNING id, github_id, github_username, avatar_url, bio`,
-      [gitHubUser.id, gitHubUser.login, gitHubUser.avatar_url, gitHubUser.bio]
-    )
-
-    if (dbResult.rows.length === 0) {
-      console.error('[v0] Failed to save user to database')
-      return NextResponse.redirect(
-        new URL('/auth/error?message=Failed to save user data', request.url)
-      )
-    }
-
-    const savedUser = dbResult.rows[0]
-    console.log('[v0] User saved to database with ID:', savedUser.id)
-
-    // Store user data in session
+    // Store user data in session (database save happens later on dashboard load)
     const userData = {
-      id: savedUser.id,
-      github_id: savedUser.github_id,
-      github_username: savedUser.github_username,
-      avatar_url: savedUser.avatar_url,
-      bio: savedUser.bio,
+      id: `user_${gitHubUser.id}`,
+      github_id: gitHubUser.id,
+      github_username: gitHubUser.login,
+      avatar_url: gitHubUser.avatar_url,
+      bio: gitHubUser.bio,
       access_token: tokenData.access_token,
     }
 
-    // Create session cookie and redirect to dashboard
-    const response = NextResponse.redirect(new URL('/dashboard', request.url))
+    console.log('[v0] Session data prepared for user:', userData.github_username)
+
+    // Create session cookie and redirect to welcome page
+    const response = NextResponse.redirect(new URL('/dashboard/welcome', request.url))
     
     // Store user session in cookie
     response.cookies.set('session', JSON.stringify(userData), {
