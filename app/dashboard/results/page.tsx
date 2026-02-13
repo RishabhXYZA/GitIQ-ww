@@ -10,21 +10,24 @@ export default function ResultsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Get analysis results from session storage
-    const storedResults = sessionStorage.getItem('analysisResults')
-    if (!storedResults) {
-      router.push('/dashboard/welcome')
-      return
-    }
+    // Only run on client side
+    if (typeof window === 'undefined') return
 
     try {
+      // Get analysis results from session storage
+      const storedResults = sessionStorage.getItem('analysisResults')
+      if (!storedResults) {
+        console.log('[v0] No analysis results found, redirecting...')
+        router.push('/dashboard/welcome')
+        return
+      }
+
       const data = JSON.parse(storedResults)
       setResults(data)
+      setLoading(false)
     } catch (error) {
       console.error('[v0] Failed to parse results:', error)
       router.push('/dashboard/welcome')
-    } finally {
-      setLoading(false)
     }
   }, [router])
 

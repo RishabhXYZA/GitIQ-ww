@@ -11,24 +11,28 @@ export default function WelcomePage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Get session from cookie
-    const sessionCookie = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('session='))
-    
-    if (!sessionCookie) {
-      router.push('/')
-      return
-    }
+    // Only run on client side
+    if (typeof window === 'undefined') return
 
     try {
-      const sessionData = JSON.parse(decodeURIComponent(sessionCookie.split('=')[1]))
+      // Get session from cookie
+      const sessionCookie = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('session='))
+      
+      if (!sessionCookie) {
+        console.log('[v0] No session found, redirecting to home...')
+        router.push('/')
+        return
+      }
+
+      const sessionString = sessionCookie.split('=')[1]
+      const sessionData = JSON.parse(decodeURIComponent(sessionString))
       setUser(sessionData)
+      setLoading(false)
     } catch (error) {
       console.error('[v0] Failed to parse session:', error)
       router.push('/')
-    } finally {
-      setLoading(false)
     }
   }, [router])
 
