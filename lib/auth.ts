@@ -44,23 +44,24 @@ export async function getGitHubUser(accessToken: string): Promise<GitHubUser | n
 
 export async function saveOrUpdateUser(gitHubUser: GitHubUser, accessToken: string) {
   try {
+    console.log('[v0] Saving user:', gitHubUser.login)
     const result = await sql`
-      INSERT INTO users (github_id, username, name, avatar_url, bio, access_token, created_at, updated_at)
-      VALUES (${gitHubUser.id}, ${gitHubUser.login}, ${gitHubUser.name}, ${gitHubUser.avatar_url}, ${gitHubUser.bio}, ${accessToken}, NOW(), NOW())
+      INSERT INTO users (github_id, github_username, avatar_url, bio)
+      VALUES (${gitHubUser.id}, ${gitHubUser.login}, ${gitHubUser.avatar_url}, ${gitHubUser.bio})
       ON CONFLICT (github_id) 
       DO UPDATE SET 
-        name = ${gitHubUser.name},
+        github_username = ${gitHubUser.login},
         avatar_url = ${gitHubUser.avatar_url},
         bio = ${gitHubUser.bio},
-        access_token = ${accessToken},
         updated_at = NOW()
-      RETURNING id, github_id, username, name, avatar_url
+      RETURNING id, github_id, github_username, avatar_url
     `
 
+    console.log('[v0] User saved successfully:', result)
     return result[0] || null
   } catch (error) {
-    console.error('Error saving user:', error)
-    return null
+    console.error('[v0] Error saving user:', error)
+    throw error // Re-throw to be caught by callback handler
   }
 }
 
@@ -80,12 +81,12 @@ export async function getUserByGitHubId(githubId: string) {
 export async function getUserById(userId: string) {
   try {
     const result = await sql`
-      SELECT id, github_id, username, name, avatar_url, bio, created_at, updated_at FROM users WHERE id = ${userId}
+      SELECT id, github_id, github_username, avatar_url, bio, created_at, updated_at FROM users WHERE id = ${userId}
     `
 
     return result[0] || null
   } catch (error) {
-    console.error('Error getting user by ID:', error)
+    console.error('[v0] Error getting user by ID:', error)
     return null
   }
 }
