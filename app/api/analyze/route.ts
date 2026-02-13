@@ -25,18 +25,19 @@ export async function POST(request: NextRequest) {
     const userId = user.id
 
     // Get user access token from database
-    const userRecord = await sql`
-      SELECT access_token FROM users WHERE id = ${userId}
-    `
+    const userRecord = await pool.query(
+      'SELECT access_token FROM users WHERE id = $1',
+      [userId]
+    )
 
-    if (userRecord.length === 0 || !userRecord[0].access_token) {
+    if (userRecord.rows.length === 0 || !userRecord.rows[0].access_token) {
       return NextResponse.json(
         { error: 'No GitHub access token found' },
         { status: 400 }
       )
     }
 
-    const accessToken = userRecord[0].access_token
+    const accessToken = userRecord.rows[0].access_token
 
     // Fetch GitHub profile data
     const profile = await getGitHubProfile(accessToken)
@@ -95,24 +96,23 @@ export async function POST(request: NextRequest) {
     )
 
     // Update GitIQ profile
-    await sql`
-      INSERT INTO gitiq_profiles (user_id, overall_score, repositories_count, analysis_result_data, last_analyzed_at)
-      VALUES (${userId}, ${profileScore.overall}, ${allRepositories.length}, ${JSON.stringify({
-        profile,
-        score: profileScore,
-        recommendations,
-      })}, NOW())
-      ON CONFLICT (user_id)
-      DO UPDATE SET
-        overall_score = ${profileScore.overall},
-        repositories_count = ${allRepositories.length},
-        analysis_result_data = ${JSON.stringify({
-          profile,
-          score: profileScore,
-          recommendations,
-        })},
-        last_analyzed_at = NOW()
-    `
+    const analysisData = JSON.stringify({
+      profile,
+      score: profileScore,
+      recommendations,
+    })
+
+    await pool.query(
+      `INSERT INTO gitiq_profiles (user_id, overall_score, repositories_count, analysis_result_data, last_analyzed_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (user_id)
+       DO UPDATE SET
+         overall_score = $2,
+         repositories_count = $3,
+         analysis_result_data = $4,
+         last_analyzed_at = NOW()`,
+      [userId, profileScore.overall, allRepositories.length, analysisData]
+    )
 
     return NextResponse.json({
       success: true,

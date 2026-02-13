@@ -22,33 +22,35 @@ export async function GET(request: NextRequest) {
     const userId = user.id
 
     // Get user profile
-    const userResult = await sql`
-      SELECT id, username, name, avatar_url, bio FROM users WHERE id = ${userId}
-    `
+    const userResult = await pool.query(
+      'SELECT id, github_username, avatar_url, bio FROM users WHERE id = $1',
+      [userId]
+    )
 
-    if (userResult.length === 0) {
+    if (userResult.rows.length === 0) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       )
     }
 
-    const userProfile = userResult[0]
+    const userProfile = userResult.rows[0]
 
     // Get GitIQ profile (latest analysis)
-    const profileResult = await sql`
-      SELECT overall_score, repositories_count, analysis_result_data, last_analyzed_at 
-      FROM gitiq_profiles 
-      WHERE user_id = ${userId}
-      ORDER BY last_analyzed_at DESC
-      LIMIT 1
-    `
+    const profileResult = await pool.query(
+      `SELECT overall_score, repositories_count, analysis_result_data, last_analyzed_at 
+       FROM gitiq_profiles 
+       WHERE user_id = $1
+       ORDER BY last_analyzed_at DESC
+       LIMIT 1`,
+      [userId]
+    )
 
-    if (profileResult.length === 0) {
+    if (profileResult.rows.length === 0) {
       return NextResponse.json({
         profile: {
-          username: userProfile.username,
-          name: userProfile.name,
+          username: userProfile.github_username,
+          name: null,
           avatar_url: userProfile.avatar_url,
           bio: userProfile.bio,
         },
@@ -58,19 +60,20 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const profile = profileResult[0]
+    const profile = profileResult.rows[0]
     const analysisData = profile.analysis_result_data
 
     // Get repositories
-    const reposResult = await sql`
-      SELECT repo_name, description, url, stars, language, topics, updated_at, forks
-      FROM repositories 
-      WHERE user_id = ${userId}
-      ORDER BY stars DESC
-      LIMIT 50
-    `
+    const reposResult = await pool.query(
+      `SELECT repo_name, description, url, stars, language, topics, updated_at, forks
+       FROM repositories 
+       WHERE user_id = $1
+       ORDER BY stars DESC
+       LIMIT 50`,
+      [userId]
+    )
 
-    const repositories = reposResult.map((repo) => ({
+    const repositories = reposResult.rows.map((repo) => ({
       id: repo.repo_name,
       name: repo.repo_name,
       description: repo.description,
@@ -84,8 +87,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       profile: {
-        username: userProfile.username,
-        name: userProfile.name,
+        username: userProfile.github_username,
+        name: null,
         avatar_url: userProfile.avatar_url,
         bio: userProfile.bio,
       },
