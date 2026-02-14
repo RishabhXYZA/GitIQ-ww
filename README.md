@@ -4,12 +4,12 @@ GitIQ is a hackathon-winning GitHub profile analysis and enhancement tool powere
 
 ## Features
 
-✨ **AI-Powered Analysis** - Google Gemini Pro Vision integration for intelligent insights
-🔐 **GitHub OAuth Authentication** - Secure access to public and private repositories
-📊 **Comprehensive Scoring** - 9 dimensions of profile evaluation
-📈 **Progress Tracking** - Historical score comparisons and improvement metrics
-💡 **Smart Recommendations** - Actionable insights to improve your GitHub presence
-🎨 **Modern Dashboard** - Beautiful, responsive interface with data visualizations
+- ✨ **AI-Powered Analysis** - Google Gemini Pro Vision integration for intelligent insights
+- 🔐 **GitHub OAuth Authentication** - Secure access to public and private repositories
+- 📊 **Comprehensive Scoring** - 9 dimensions of profile evaluation
+- 📈 **Progress Tracking** - Historical score comparisons and improvement metrics
+- 💡 **Smart Recommendations** - Actionable insights to improve your GitHub presence
+- 🎨 **Modern Dashboard** - Beautiful, responsive interface with data visualizations
 
 ## Project Structure
 
@@ -208,6 +208,9 @@ Recommendations are prioritized as high, medium, or low and include:
 - [ ] Export analysis as PDF
 - [ ] Community benchmarking
 - [ ] Integration with more AI providers
+
+## Try iy Live
+https://v0-git-iq-profile-analyzer-t5.vercel.app/
 
 ## License
 
