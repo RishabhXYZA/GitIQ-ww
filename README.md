@@ -212,10 +212,6 @@ Recommendations are prioritized as high, medium, or low and include:
 ## Try iy Live
 https://v0-git-iq-profile-analyzer-t5.vercel.app/
 
-## License
-
-MIT License - Feel free to use for hackathons and personal projects.
-
 ## Support
 
 For issues or questions:
